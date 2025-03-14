@@ -27,6 +27,7 @@ class Universe {
     private:
     vector<vector<char>> arr;
     bool wasChanged;
+    bool useFixedWorldSize;
 
     // Apply padding to a 2d array. 
     void padArray_(int pad_left, int pad_right, int pad_top, int pad_bot){
@@ -88,6 +89,7 @@ class Universe {
         Universe(string filename){
             load(filename);
             wasChanged = true;
+            useFixedWorldSize = false;
         }
         // Initialize from 2D vector with padding to desired size.
         Universe(vector<vector<char>> initial_state, size_t rows, size_t cols) : arr(initial_state) {
@@ -106,12 +108,14 @@ class Universe {
             }
             padArray_(pad_left, pad_right, pad_top, pad_bot);
             wasChanged = true;
+            useFixedWorldSize = true;
             
         }
         // Move 1 timestep forward in the game of life.
         void progress(){
-            //pad array with zeros on all sides.
-            padArray_(1,1,1,1);
+            //pad array with zeros on all sides if we are tracking.
+            if (!useFixedWorldSize) padArray_(1,1,1,1);
+
             int rows = arr.size();
             int cols = arr[0].size();
             vector<vector<int>> prefix(rows+1, vector<int>(cols+1,0));
@@ -150,11 +154,13 @@ class Universe {
                     else new_val = '0';
                     
                     // Update bounding box.
-                    if (new_val == '1'){
-                        min_y = min(min_y, i);
-                        max_y = max(max_y, i);
-                        min_x = min(min_x, j);
-                        max_x = max(max_x, j);
+                    if (!useFixedWorldSize) {
+                        if (new_val == '1'){
+                            min_y = min(min_y, i);
+                            max_y = max(max_y, i);
+                            min_x = min(min_x, j);
+                            max_x = max(max_x, j);
+                        }
                     }
                     if (new_val != arr[i][j]) {
                         arr[i][j] = new_val;
@@ -163,8 +169,9 @@ class Universe {
                 }
             }
             // crop down to bounding box
-            arr = crop2DArray_(arr, min_y, max_y, min_x, max_x);
-
+            if (!useFixedWorldSize) {
+                arr = crop2DArray_(arr, min_y, max_y, min_x, max_x);
+            }
         }
         // Function to display the 2d vector stored in the universe.
         void printArray(vector<vector<char>> arr) {
@@ -270,35 +277,52 @@ int main(int argc, char* argv[]) {
     // Input handling
     if (argc == 1){
         filename = "glider.csv";
+        Universe uni(filename);
+        // Run the game of life
+        uni.animate();
     }
     if (argc == 2){
         filename = argv[1];
+        Universe uni(filename);
+        // Run the game of life
+        uni.animate();
     }
+    if (argc == 3){
+        filename = argv[1];
+        rows = cols = atoi(argv[2]);
 
 
-    // This code can load in an unencoded CSV file
-    /*
-    try{
         load_organism(filename, &arr);
-    } catch (const invalid_argument& e) {
-        cerr << "Error: " << e.what() << endl;
+
+        //initialize the game of life
+        Universe uni(arr, rows, cols);
+        uni.save("input_state.csv");
+        uni.animate();
+
+        // If game completes, load initial state and display it
+        cout << "Loading initial state..." << endl;
+        uni.load("input_state.csv");
+        cout << "Initial State:" << endl;
+        uni.print();
     }
-        
-    //initialize the game of life
-    Universe uni(arr, 50, 50);
-    uni.save("input_state.csv");
-    */
+    if (argc == 4){
+        filename = argv[1];
+        rows = atoi(argv[2]);
+        cols = atoi(argv[3]);
 
-    // Initialize the game of life
-    Universe uni(filename);
-    
 
-    // Run the game of life
-    uni.animate();
+        load_organism(filename, &arr);
 
-    // If game completes, load initial state and display it
-    cout << "Loading initial state..." << endl;
-    uni.load(filename);
-    cout << "Initial State:" << endl;
-    uni.print();
+        //initialize the game of life
+        Universe uni(arr, rows, cols);
+        uni.save("input_state.csv");
+        uni.animate();
+
+        // If game completes, load initial state and display it
+        cout << "Loading initial state..." << endl;
+        uni.load(filename);
+        cout << "Initial State:" << endl;
+        uni.print();
+    }
+
 }
