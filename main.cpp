@@ -6,6 +6,7 @@
 #include <chrono>
 #include <thread>
 #include <vector>
+
 using namespace std;
 
 // Function to clear the console screen
@@ -59,7 +60,36 @@ class Universe {
         return encoded_arr;
     }
     //Crops array to minimum and maximum nonzero elements
+    vector<vector<char>> crop2DArray_(const vector<vector<char>>& array, int startRow, int endRow, int startCol, int endCol){
+        vector<vector<char>> croppedArray;
+
+        if (startRow < 0 || endRow + 1 > array.size() || startCol < 0|| endCol + 1 > array[0].size()){
+            /*
+            string message = "Invalid cropping indices: " + startRow + ", " + endRow
+                             + ', ' + startCol + ', ' + endCol
+                             + 'is outside array of size: ' + array.size() + ", " + array[0].size(); 
+            throw invalid_argument(message);
+            */
+            throw invalid_argument("Invalid cropping indices.");
+            return croppedArray;
+        }
+        for (int i = startRow; i <= endRow; i++){
+            vector<char> row;
+            for (int j = startCol; j <= endCol; j++){
+                row.push_back(array[i][j]);
+            }
+            croppedArray.push_back(row);
+        }
+        return croppedArray;
+    }
     public:
+
+        // Initialize from file
+        Universe(string filename){
+            load(filename);
+            wasChanged = true;
+        }
+        // Initialize from 2D vector with padding to desired size.
         Universe(vector<vector<char>> initial_state, size_t rows, size_t cols) : arr(initial_state) {
             int pad_left, pad_right, pad_top, pad_bot;
             if (rows - arr.size() <= 0) pad_top = pad_bot = 0;
@@ -80,9 +110,15 @@ class Universe {
         }
         // Move 1 timestep forward in the game of life.
         void progress(){
+            //pad array with zeros on all sides.
+            padArray_(1,1,1,1);
             int rows = arr.size();
             int cols = arr[0].size();
             vector<vector<int>> prefix(rows+1, vector<int>(cols+1,0));
+            int min_x = cols - 1;
+            int min_y = rows - 1;
+            int max_x = 0;
+            int max_y = 0;
 
             wasChanged = false;
 
@@ -112,19 +148,28 @@ class Universe {
                     if (arr[i][j] == '0' && sum == 3) new_val = '1';
                     else if (arr[i][j] == '1' && (sum == 2 || sum == 3)) new_val ='1';
                     else new_val = '0';
-
+                    
+                    // Update bounding box.
+                    if (new_val == '1'){
+                        min_y = min(min_y, i);
+                        max_y = max(max_y, i);
+                        min_x = min(min_x, j);
+                        max_x = max(max_x, j);
+                    }
                     if (new_val != arr[i][j]) {
                         arr[i][j] = new_val;
                         wasChanged = true;
                     }
                 }
             }
+            // crop down to bounding box
+            arr = crop2DArray_(arr, min_y, max_y, min_x, max_x);
+
         }
         // Function to display the 2d vector stored in the universe.
         void printArray(vector<vector<char>> arr) {
             for (const auto& row : arr) {
                 for (const auto& element : row) {
-                    //const char out_char = element;
                     const char* out_char = (element == '1') ? "@" : ".";
                     cout << out_char << " ";
                 }
@@ -166,6 +211,7 @@ class Universe {
             in.open(filename);
             if (!in.is_open()) {
                 throw invalid_argument("Could not open "+ filename);
+                return;
             }
             string line;
             if (getline(in, line)){
@@ -223,38 +269,36 @@ int main(int argc, char* argv[]) {
     int rows, cols;
     // Input handling
     if (argc == 1){
-        rows = cols = 50;
         filename = "glider.csv";
     }
     if (argc == 2){
         filename = argv[1];
-        rows = cols = 50;
-    }
-    if (argc == 3){
-        filename = argv[1];
-        rows = cols = stoi(argv[2]);
-    }
-    if (argc == 4){
-        filename = argv[1];
-        rows = stoi(argv[2]);
-        cols = stoi(argv[3]);
     }
 
-    // Load from csv file
+
+    // This code can load in an unencoded CSV file
+    /*
     try{
         load_organism(filename, &arr);
     } catch (const invalid_argument& e) {
         cerr << "Error: " << e.what() << endl;
     }
+        
     //initialize the game of life
-    Universe uni(arr, rows, cols);
-    uni.save("glider2.csv");
+    Universe uni(arr, 50, 50);
+    uni.save("input_state.csv");
+    */
+
+    // Initialize the game of life
+    Universe uni(filename);
+    
+
     // Run the game of life
     uni.animate();
+
+    // If game completes, load initial state and display it
     cout << "Loading initial state..." << endl;
-    uni.load("glider2.csv");
+    uni.load(filename);
     cout << "Initial State:" << endl;
     uni.print();
-
-    
 }
